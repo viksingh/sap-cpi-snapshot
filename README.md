@@ -52,15 +52,17 @@ java -jar target/sap-cpi-snapshot.jar snapshot -k servicekey.json -o ../cpi-tria
 | `-o, --out DIR` | Target folder inside a git working tree |
 | `--include REGEX` / `--exclude REGEX` | Filter packages by ID |
 | `--[no-]prune` | Remove folders of packages deleted from the tenant (default on). Only folders containing `package.json` are touched |
+| `--allow-empty` | Accept a tenant with no packages (see *Empty tenant guard*) |
 | `--commit`, `-m TEXT`, `--push` | Commit (and push) when something changed |
 | `-v` | Print every artifact |
 
-Exit codes: `0` success, `1` some artifacts failed (the rest is still written), `2` configuration or connection error.
+Exit codes: `0` success, `1` some artifacts failed (the rest is still written), `2` configuration or connection error, `3` tenant returned no packages but the snapshot has some (nothing changed).
 
 ## Behaviour
 
 - **Safe updates:** each package is built in a staging folder and swapped in. If listing a package fails, its previous snapshot is kept.
 - **Retries:** HTTP 429/5xx are retried with back-off. A 401 refreshes the OAuth token once.
+- **Empty tenant guard:** if the tenant returns no packages while the snapshot folder already holds some, the run stops with exit code 3 and nothing is changed or committed. This usually means the trial was reset or deleted, or the service key points to a different tenant. Pass `--allow-empty` to accept an empty tenant.
 - **ZIP safety:** entries that would escape the target folder are rejected.
 
 ## Not included

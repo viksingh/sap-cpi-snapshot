@@ -60,7 +60,22 @@ public class SnapshotService {
         this.verbose = verbose;
     }
 
-    public record Options(Path outDir, Pattern include, Pattern exclude, boolean prune) {
+    /**
+     * @param allowEmpty accept a tenant that returns no packages even though the snapshot
+     *                   folder already holds packages (normally treated as an error, since it
+     *                   usually means the tenant was reset, deleted or the key points elsewhere)
+     */
+    public record Options(Path outDir, Pattern include, Pattern exclude, boolean prune, boolean allowEmpty) {
+        public Options(Path outDir, Pattern include, Pattern exclude, boolean prune) {
+            this(outDir, include, exclude, prune, false);
+        }
+    }
+
+    /** Thrown when the tenant looks empty but the existing snapshot is not. Nothing is written. */
+    public static class EmptyTenantException extends IOException {
+        public EmptyTenantException(String message) {
+            super(message);
+        }
     }
 
     public record Summary(int packages, int artifacts, List<String> failures, List<String> pruned) {
@@ -75,6 +90,16 @@ public class SnapshotService {
 
         List<JsonNode> packages = new ArrayList<>(client.listPackages());
         packages.sort(Comparator.comparing(p -> p.path("Id").asText()));
+
+        if (packages.isEmpty() && !opt.allowEmpty()) {
+            List<String> existing = existingPackageFolders(out);
+            if (!existing.isEmpty()) {
+                throw new EmptyTenantException("Tenant returned no integration packages, but the snapshot has "
+                        + existing.size() + " (" + String.join(", ", existing) + "). Nothing was changed. "
+                        + "The tenant may have been reset or deleted, or the service key points to another tenant. "
+                        + "Use --allow-empty if the tenant really is empty now.");
+            }
+        }
 
         List<String> failures = new ArrayList<>();
         Set<String> written = new HashSet<>();
@@ -206,6 +231,19 @@ public class SnapshotService {
         }
         removed.sort(String::compareTo);
         return removed;
+    }
+
+    private static List<String> existingPackageFolders(Path out) throws IOException {
+        List<String> found = new ArrayList<>();
+        try (DirectoryStream<Path> dirs = Files.newDirectoryStream(out, Files::isDirectory)) {
+            for (Path dir : dirs) {
+                if (Files.isRegularFile(dir.resolve(PACKAGE_MARKER))) {
+                    found.add(dir.getFileName().toString());
+                }
+            }
+        }
+        found.sort(String::compareTo);
+        return found;
     }
 
     private static boolean selected(String id, Options opt) {

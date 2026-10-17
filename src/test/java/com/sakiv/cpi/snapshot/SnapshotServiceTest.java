@@ -154,6 +154,38 @@ class SnapshotServiceTest {
     }
 
     @Test
+    void emptyTenantWithExistingSnapshotIsRejectedAndNothingChanges() throws Exception {
+        run(true);
+        String manifest = Files.readString(out.resolve(SnapshotService.MANIFEST));
+        mock.tenant.clear();
+
+        SnapshotService.EmptyTenantException e =
+                assertThrows(SnapshotService.EmptyTenantException.class, () -> run(true));
+        assertTrue(e.getMessage().contains("no integration packages"));
+        assertTrue(Files.exists(out.resolve("CertAuthPoC/iflows/Cert_HTTP_Inbound")));
+        assertEquals(manifest, Files.readString(out.resolve(SnapshotService.MANIFEST)));
+    }
+
+    @Test
+    void emptyTenantAllowedWhenRequested() throws Exception {
+        run(true);
+        mock.tenant.clear();
+        PrintStream quiet = new PrintStream(new ByteArrayOutputStream());
+        SnapshotService.Summary s = new SnapshotService(client, quiet, false)
+                .run(new SnapshotService.Options(out, null, null, true, true));
+        assertEquals(0, s.packages());
+        assertFalse(Files.exists(out.resolve("CertAuthPoC")));
+    }
+
+    @Test
+    void emptyTenantOnFirstRunIsFine() throws Exception {
+        mock.tenant.clear();
+        SnapshotService.Summary s = run(true);
+        assertTrue(s.ok());
+        assertEquals(0, s.packages());
+    }
+
+    @Test
     void zipSlipIsRejected(@TempDir Path target) throws Exception {
         byte[] evil = MockCpiServer.zip(Map.of("../../escape.txt", "x"));
         IOException e = assertThrows(IOException.class, () -> ZipExtractor.extract(evil, target));

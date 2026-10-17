@@ -37,6 +37,11 @@ public class SnapshotCommand implements Callable<Integer> {
             description = "Remove package folders that no longer exist on the tenant (default: ${DEFAULT-VALUE}).")
     boolean prune;
 
+    @Option(names = "--allow-empty",
+            description = "Accept a tenant with no packages and clear the snapshot. Without it, an empty tenant "
+                    + "with a non-empty snapshot is an error (exit code 3) and nothing is changed.")
+    boolean allowEmpty;
+
     @Option(names = "--commit", description = "git add + commit OUT_DIR when something changed.")
     boolean commit;
 
@@ -57,7 +62,13 @@ public class SnapshotCommand implements Callable<Integer> {
         System.out.println("Target : " + outDir.toAbsolutePath().normalize());
 
         SnapshotService service = new SnapshotService(new CpiClient(config), System.out, verbose);
-        SnapshotService.Summary s = service.run(new SnapshotService.Options(outDir, include, exclude, prune));
+        SnapshotService.Summary s;
+        try {
+            s = service.run(new SnapshotService.Options(outDir, include, exclude, prune, allowEmpty));
+        } catch (SnapshotService.EmptyTenantException e) {
+            System.err.println("\nError: " + e.getMessage());
+            return 3;
+        }
 
         System.out.printf("%nPackages: %d, artifacts: %d%n", s.packages(), s.artifacts());
         if (!s.pruned().isEmpty()) {
