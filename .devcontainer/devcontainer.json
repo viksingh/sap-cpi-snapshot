@@ -1,0 +1,17 @@
+{
+  "name": "sap-cpi-snapshot",
+  "image": "mcr.microsoft.com/devcontainers/java:1-21-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "none",
+      "installMaven": "true"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "postCreateCommand": "mvn -q -B package && echo 'alias cpi-snapshot=\"java -jar $PWD/target/sap-cpi-snapshot.jar\"' >> ~/.bashrc",
+  "customizations": {
+    "vscode": {
+      "extensions": ["vscjava.vscode-java-pack"]
+    }
+  }
+}

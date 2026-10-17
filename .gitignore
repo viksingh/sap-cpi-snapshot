@@ -1,0 +1,8 @@
+target/
+*.iml
+.idea/
+.vscode/
+# never commit credentials
+servicekey*.json
+*.servicekey.json
+.env

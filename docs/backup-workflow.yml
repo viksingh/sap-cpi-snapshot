@@ -1,0 +1,49 @@
+# Example workflow for a SEPARATE backup repository (e.g. viksingh/cpi-trial).
+# Copy it to that repo's .github/workflows/ and add these Actions secrets:
+#   CPI_URL, CPI_TOKEN_URL, CPI_CLIENT_ID, CPI_CLIENT_SECRET
+# If sap-cpi-snapshot is a private repo, also add TOOL_REPO_TOKEN: a fine-grained
+# personal access token with read-only "Contents" access to that repo.
+name: CPI snapshot
+
+on:
+  schedule:
+    - cron: '0 18 * * *'   # 05:00 Sydney (AEDT)
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out backup repo
+        uses: actions/checkout@v4
+
+      - name: Check out tool
+        uses: actions/checkout@v4
+        with:
+          repository: viksingh/sap-cpi-snapshot
+          path: .tool
+          token: ${{ secrets.TOOL_REPO_TOKEN || github.token }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build tool
+        run: mvn -q -B -f .tool/pom.xml package -DskipTests
+
+      - name: Snapshot tenant and commit
+        env:
+          CPI_URL: ${{ secrets.CPI_URL }}
+          CPI_TOKEN_URL: ${{ secrets.CPI_TOKEN_URL }}
+          CPI_CLIENT_ID: ${{ secrets.CPI_CLIENT_ID }}
+          CPI_CLIENT_SECRET: ${{ secrets.CPI_CLIENT_SECRET }}
+        run: |
+          echo ".tool/" >> .git/info/exclude
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          java -jar .tool/target/sap-cpi-snapshot.jar snapshot -o content --push
